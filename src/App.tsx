@@ -21,6 +21,8 @@ import {
   SlidersHorizontal, Sparkles, Filter, AlertTriangle, Download, Printer
 } from 'lucide-react';
 
+const STORE_PUBLIC_URL = 'https://slick-shop-supabase.vercel.app';
+
 // Default initial catalog
 const ALL_DEMO_PRODUCTS = [
   {
@@ -409,10 +411,20 @@ export default function App() {
     const supabase = requireSupabase();
     const hashParams = new URLSearchParams(window.location.hash.slice(1));
     const queryParams = new URLSearchParams(window.location.search);
+    const recoveryError = hashParams.get('error_code') || queryParams.get('error_code');
     if (hashParams.get('type') === 'recovery' || queryParams.get('type') === 'recovery') {
       setIsAdminOpen(true);
       setAdminAuthMode('updatePassword');
       setAdminLoginError('');
+      setAdminLoginMessage('');
+    } else if (recoveryError) {
+      setIsAdminOpen(true);
+      setAdminAuthMode('recover');
+      setAdminLoginError(
+        recoveryError === 'otp_expired'
+          ? 'El enlace de recuperación venció o ya fue usado. Solicita uno nuevo y ábrelo una sola vez.'
+          : 'El enlace de recuperación no es válido. Solicita uno nuevo desde esta pantalla.'
+      );
       setAdminLoginMessage('');
     }
 
@@ -578,7 +590,7 @@ export default function App() {
     try {
       const supabase = requireSupabase();
       const { error } = await supabase.auth.resetPasswordForEmail(adminEmailInput, {
-        redirectTo: window.location.origin,
+        redirectTo: STORE_PUBLIC_URL,
       });
       if (error) throw error;
       setAdminLoginMessage('Te enviamos un enlace para restablecer la contraseña. Revisa tu correo.');

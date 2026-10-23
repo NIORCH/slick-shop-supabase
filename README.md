@@ -11,6 +11,15 @@ Aplicación React lista para administrar catálogo, configuración y pedidos des
 - Seguimiento público de pedidos por código.
 - Estados de pedido y reclamaciones desde el panel.
 
+## Recuperación de contraseña de administración
+
+En Supabase, configura **Authentication → URL Configuration**:
+
+- **Site URL:** `https://slick-shop-supabase.vercel.app`
+- **Redirect URLs:** agrega `https://slick-shop-supabase.vercel.app`
+
+Los enlaces de recuperación deben abrir el dominio público estable de la tienda, no una URL individual de un deployment de Vercel. La aplicación solicita la recuperación redirigiendo a ese dominio.
+
 
 ## React Compiler
 
@@ -35,4 +44,3 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
-
