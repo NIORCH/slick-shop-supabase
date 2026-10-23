@@ -407,6 +407,15 @@ export default function App() {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const supabase = requireSupabase();
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const queryParams = new URLSearchParams(window.location.search);
+    if (hashParams.get('type') === 'recovery' || queryParams.get('type') === 'recovery') {
+      setIsAdminOpen(true);
+      setAdminAuthMode('updatePassword');
+      setAdminLoginError('');
+      setAdminLoginMessage('');
+    }
+
     const syncAdmin = async (user) => {
       if (!user) {
         setIsAdminAuthenticated(false);
@@ -446,7 +455,7 @@ export default function App() {
         setAdminLoginError('');
         setAdminLoginMessage('');
       }
-      syncAdmin(session?.user);
+      window.setTimeout(() => syncAdmin(session?.user), 0);
     });
     return () => listener.subscription.unsubscribe();
   }, []);
