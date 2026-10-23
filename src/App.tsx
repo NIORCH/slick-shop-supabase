@@ -313,8 +313,12 @@ export default function App() {
   // Hidden Admin State
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [adminAuthMode, setAdminAuthMode] = useState<'login' | 'recover' | 'updatePassword'>('login');
+  const [adminEmailInput, setAdminEmailInput] = useState('');
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminPasswordConfirmation, setAdminPasswordConfirmation] = useState('');
   const [adminLoginError, setAdminLoginError] = useState('');
+  const [adminLoginMessage, setAdminLoginMessage] = useState('');
   const [adminTab, setAdminTab] = useState('products'); // 'products', 'reclamos', 'orders', 'metrics'
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
@@ -435,7 +439,15 @@ export default function App() {
       }
     };
     supabase.auth.getUser().then(({ data }) => syncAdmin(data.user));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => syncAdmin(session?.user));
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsAdminOpen(true);
+        setAdminAuthMode('updatePassword');
+        setAdminLoginError('');
+        setAdminLoginMessage('');
+      }
+      syncAdmin(session?.user);
+    });
     return () => listener.subscription.unsubscribe();
   }, []);
 
@@ -497,7 +509,9 @@ export default function App() {
   // Function to open Secret Admin Modal
   const triggerHiddenAdmin = () => {
     setIsAdminOpen(true);
+    setAdminAuthMode('login');
     setAdminLoginError('');
+    setAdminLoginMessage('');
   };
 
   // Secret Triple-click Handler on Main Header Logo
@@ -521,6 +535,7 @@ export default function App() {
       if (adminPasswordInput === 'admin123') {
         setIsAdminAuthenticated(true);
         setAdminLoginError('');
+        setAdminLoginMessage('');
         setAdminPasswordInput('');
       } else {
         setAdminLoginError('Clave de acceso incorrecta. Intento denegado.');
@@ -530,15 +545,57 @@ export default function App() {
 
     try {
       const supabase = requireSupabase();
-      const { error } = await supabase.auth.signInWithOtp({
-        email: adminPasswordInput,
-        options: { emailRedirectTo: window.location.origin },
+      const { error } = await supabase.auth.signInWithPassword({
+        email: adminEmailInput,
+        password: adminPasswordInput,
       });
       if (error) throw error;
-      setAdminLoginError('Revisa tu correo: recibirás un enlace seguro de acceso.');
+      setAdminLoginError('');
+      setAdminLoginMessage('');
       setAdminPasswordInput('');
     } catch (error) {
-      setAdminLoginError(error instanceof Error ? error.message : 'No se pudo iniciar sesión.');
+      setAdminLoginError(
+        error instanceof TypeError && error.message === 'Failed to fetch'
+          ? 'No se pudo conectar con Supabase. Verifica la configuración del proyecto y vuelve a intentarlo.'
+          : error instanceof Error ? error.message : 'No se pudo iniciar sesión.'
+      );
+    }
+  };
+
+  const handleAdminPasswordRecovery = async (e) => {
+    e.preventDefault();
+    setAdminLoginError('');
+    setAdminLoginMessage('');
+    try {
+      const supabase = requireSupabase();
+      const { error } = await supabase.auth.resetPasswordForEmail(adminEmailInput, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setAdminLoginMessage('Te enviamos un enlace para restablecer la contraseña. Revisa tu correo.');
+    } catch (error) {
+      setAdminLoginError(error instanceof Error ? error.message : 'No se pudo enviar el correo de recuperación.');
+    }
+  };
+
+  const handleAdminPasswordUpdate = async (e) => {
+    e.preventDefault();
+    setAdminLoginError('');
+    setAdminLoginMessage('');
+    if (adminPasswordInput !== adminPasswordConfirmation) {
+      setAdminLoginError('Las contraseñas no coinciden.');
+      return;
+    }
+    try {
+      const supabase = requireSupabase();
+      const { error } = await supabase.auth.updateUser({ password: adminPasswordInput });
+      if (error) throw error;
+      setAdminAuthMode('login');
+      setAdminPasswordInput('');
+      setAdminPasswordConfirmation('');
+      setAdminLoginMessage('Contraseña actualizada. Ya puedes ingresar con tu correo y contraseña nuevos.');
+    } catch (error) {
+      setAdminLoginError(error instanceof Error ? error.message : 'No se pudo actualizar la contraseña.');
     }
   };
 
@@ -1313,13 +1370,49 @@ export default function App() {
               <button onClick={() => setIsAdminOpen(false)} className="p-2 hover:bg-slate-100 rounded" aria-label="Cerrar panel"><X className="w-5 h-5" /></button>
             </header>
 
-            {!isAdminAuthenticated ? (
-              <form onSubmit={handleAdminLogin} className="max-w-sm mx-auto p-8 space-y-4">
-                <h3 className="font-bold text-lg">Acceso de administrador</h3>
-                <label className="block text-sm font-medium" htmlFor="admin-password">Contraseña</label>
-                <input id="admin-password" type="password" value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2" autoComplete="current-password" required />
+            {!isAdminAuthenticated || adminAuthMode === 'updatePassword' ? (
+              <form
+                onSubmit={adminAuthMode === 'recover' ? handleAdminPasswordRecovery : adminAuthMode === 'updatePassword' ? handleAdminPasswordUpdate : handleAdminLogin}
+                className="max-w-sm mx-auto p-8 space-y-4"
+              >
+                <h3 className="font-bold text-lg">
+                  {adminAuthMode === 'recover' ? 'Recuperar contraseña' : adminAuthMode === 'updatePassword' ? 'Crear nueva contraseña' : 'Acceso de administrador'}
+                </h3>
+                {adminAuthMode !== 'updatePassword' && (
+                  <>
+                    <label className="block text-sm font-medium" htmlFor="admin-email">Correo del administrador</label>
+                    <input id="admin-email" type="email" value={adminEmailInput} onChange={(e) => setAdminEmailInput(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2" autoComplete="email" required />
+                  </>
+                )}
+                {(adminAuthMode === 'login' || adminAuthMode === 'updatePassword') && (
+                  <>
+                    <label className="block text-sm font-medium" htmlFor="admin-password">
+                      {adminAuthMode === 'updatePassword' ? 'Nueva contraseña' : 'Contraseña'}
+                    </label>
+                    <input id="admin-password" type="password" value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2" autoComplete={adminAuthMode === 'updatePassword' ? 'new-password' : 'current-password'} minLength={6} required />
+                  </>
+                )}
+                {adminAuthMode === 'updatePassword' && (
+                  <>
+                    <label className="block text-sm font-medium" htmlFor="admin-password-confirmation">Confirmar nueva contraseña</label>
+                    <input id="admin-password-confirmation" type="password" value={adminPasswordConfirmation} onChange={(e) => setAdminPasswordConfirmation(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2" autoComplete="new-password" minLength={6} required />
+                  </>
+                )}
                 {adminLoginError && <p className="text-sm text-rose-600">{adminLoginError}</p>}
-                <button className="w-full bg-black text-white py-2.5 rounded font-bold">Ingresar</button>
+                {adminLoginMessage && <p className="text-sm text-emerald-700">{adminLoginMessage}</p>}
+                <button className="w-full bg-black text-white py-2.5 rounded font-bold">
+                  {adminAuthMode === 'recover' ? 'Enviar enlace de recuperación' : adminAuthMode === 'updatePassword' ? 'Guardar contraseña nueva' : 'Ingresar'}
+                </button>
+                {adminAuthMode === 'login' && isSupabaseConfigured && (
+                  <button type="button" onClick={() => { setAdminAuthMode('recover'); setAdminLoginError(''); setAdminLoginMessage(''); }} className="w-full py-2 text-sm text-slate-600 hover:text-black">
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                )}
+                {adminAuthMode === 'recover' && (
+                  <button type="button" onClick={() => { setAdminAuthMode('login'); setAdminLoginError(''); setAdminLoginMessage(''); }} className="w-full py-2 text-sm text-slate-600 hover:text-black">
+                    Volver al inicio de sesión
+                  </button>
+                )}
               </form>
             ) : (
               <div>
