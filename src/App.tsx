@@ -184,12 +184,19 @@ const INITIAL_PRODUCTS = ALL_DEMO_PRODUCTS
   }));
 
 const INITIAL_STORE_INFO = {
-  name: 'SLICK',
-  legalName: 'SLICK PERÚ S.A.C.',
+  name: 'NH',
+  legalName: '',
   description: 'Especialistas en calzado, ropa y accesorios urbanos para todo el Perú.',
   phone: '+51 987 654 321',
   whatsapp: '51987654321',
   address: 'Av. José Larco 456, Miraflores, Lima'
+};
+
+const normalizeStoreInfo = (storeInfo) => {
+  const normalized = { ...INITIAL_STORE_INFO, ...storeInfo };
+  if (normalized.name?.trim().toUpperCase() === 'SLICK') normalized.name = 'NH';
+  if (normalized.legalName?.trim().toUpperCase() === 'SLICK PERÚ S.A.C.') normalized.legalName = '';
+  return normalized;
 };
 
 const INITIAL_SITE_CONTENT = {
@@ -266,7 +273,7 @@ export default function App() {
 
   const [storeInfo, setStoreInfo] = useState(() => {
     const saved = localStorage.getItem('slick_store_info');
-    return saved ? { ...INITIAL_STORE_INFO, ...JSON.parse(saved) } : INITIAL_STORE_INFO;
+    return saved ? normalizeStoreInfo(JSON.parse(saved)) : INITIAL_STORE_INFO;
   });
   const [storeDraft, setStoreDraft] = useState(storeInfo);
   const [siteContent, setSiteContent] = useState(() => {
@@ -379,8 +386,9 @@ export default function App() {
         if (!mounted) return;
         if (cloud.products.length > 0) setProducts(cloud.products.map(normalizeProduct));
         if (cloud.settings) {
-          setStoreInfo(cloud.settings.store_info);
-          setStoreDraft(cloud.settings.store_info);
+          const normalizedStoreInfo = normalizeStoreInfo(cloud.settings.store_info);
+          setStoreInfo(normalizedStoreInfo);
+          setStoreDraft(normalizedStoreInfo);
           setSiteContent(cloud.settings.site_content);
           setSiteContentDraft(cloud.settings.site_content);
         }
@@ -947,7 +955,7 @@ export default function App() {
           <div 
             onClick={handleLogoClick}
             className="cursor-pointer select-none group flex items-center gap-2"
-            title="Slick Peru"
+            title="NH Perú"
           >
             <div className="bg-black text-white px-3 py-1 font-black text-2xl tracking-tighter group-hover:scale-105 transition-transform">
               {storeInfo.name}
@@ -1061,7 +1069,7 @@ export default function App() {
           <div className="flex justify-center relative order-first md:order-last max-h-[300px] sm:max-h-[360px]">
             <img 
               src={siteContent.heroProductImage}
-              alt="Polo esencial SLICK" 
+              alt="Polo esencial NH"
               className="h-56 sm:h-72 md:h-80 max-w-full object-contain drop-shadow-xl"
             />
           </div>
@@ -1308,7 +1316,7 @@ export default function App() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 flex justify-between text-[11px] text-slate-500">
-          <p>© 2026 {storeInfo.legalName}. Todos los derechos reservados.</p>
+          <p>© 2026 {storeInfo.legalName || storeInfo.name}. Todos los derechos reservados.</p>
         </div>
       </footer>
 
@@ -1600,11 +1608,11 @@ export default function App() {
 
                   {adminTab === 'store' && (
                     <form onSubmit={handleSaveStore} className="max-w-2xl space-y-4">
-                      <div><h3 className="font-bold text-lg">Datos de la empresa</h3><p className="text-sm text-slate-500">Se guardan en Supabase y aparecen en la tienda publicada.</p></div>
+                      <div><h3 className="font-bold text-lg">Datos comerciales de la tienda</h3><p className="text-sm text-slate-500">Se guardan en Supabase y aparecen en la tienda publicada.</p></div>
                       <label className="block text-sm">Nombre comercial
                         <input required value={storeDraft.name} onChange={(e) => setStoreDraft({ ...storeDraft, name: e.target.value })} className="mt-1 w-full border border-slate-300 rounded px-3 py-2" />
                       </label>
-                      <label className="block text-sm">Razón social
+                      <label className="block text-sm">Razón social (opcional, si aplica)
                         <input value={storeDraft.legalName} onChange={(e) => setStoreDraft({ ...storeDraft, legalName: e.target.value })} className="mt-1 w-full border border-slate-300 rounded px-3 py-2" />
                       </label>
                       <label className="block text-sm">Descripción de la tienda

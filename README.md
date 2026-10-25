@@ -1,4 +1,4 @@
-# Tienda SLICK con Supabase y Vercel
+# Tienda NH con Supabase y Vercel
 
 Aplicación React lista para administrar catálogo, configuración y pedidos desde la página publicada.
 
