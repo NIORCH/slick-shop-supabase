@@ -304,6 +304,8 @@ export default function App() {
   const [selectedSizes, setSelectedSizes] = useState<Record<number, string>>({});
   const [selectedColors, setSelectedColors] = useState<Record<number, string>>({});
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartNotice, setCartNotice] = useState('');
+  const cartNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isReclamosOpen, setIsReclamosOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<string | null>(null); // 'politica', 'terminos', 'envios', 'devoluciones'
@@ -405,6 +407,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('slick_cart', JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => () => {
+    if (cartNoticeTimerRef.current !== null) clearTimeout(cartNoticeTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -622,6 +628,7 @@ export default function App() {
 
   // Cart Operations
   const addToCart = (product, size, color = '') => {
+    if (Number(product.stock) <= 0) return;
     setCart(prevCart => {
       const existingIndex = prevCart.findIndex(
         item => item.id === product.id && item.selectedSize === size && item.selectedColor === color
@@ -639,7 +646,9 @@ export default function App() {
         }];
       }
     });
-    setIsCartOpen(true);
+    setCartNotice(`${product.name} se añadió al carrito.`);
+    if (cartNoticeTimerRef.current !== null) clearTimeout(cartNoticeTimerRef.current);
+    cartNoticeTimerRef.current = setTimeout(() => setCartNotice(''), 2200);
   };
 
   const updateCartQuantity = (index, delta) => {
@@ -1143,6 +1152,11 @@ export default function App() {
                     <p className="text-xs text-slate-500 mt-1 line-clamp-2 font-light">
                       {product.description}
                     </p>
+                    <p className={`mt-3 text-xs font-semibold ${Number(product.stock) > 0 ? 'text-slate-600' : 'text-rose-600'}`}>
+                      {Number(product.stock) > 0
+                        ? `Stock disponible: ${Number(product.stock)} ${Number(product.stock) === 1 ? 'unidad' : 'unidades'}`
+                        : 'Agotado'}
+                    </p>
 
                     {product.sizes?.length > 0 && (
                       <div className="mt-4">
@@ -1184,10 +1198,11 @@ export default function App() {
 
                     <button
                       onClick={() => addToCart(product, selectedSizes[product.id], selectedColors[product.id])}
-                      className="bg-black text-white hover:bg-slate-800 text-xs font-extrabold uppercase px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 shadow-sm active:scale-95"
+                      disabled={Number(product.stock) <= 0}
+                      className="bg-black text-white hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-xs font-extrabold uppercase px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 shadow-sm active:scale-95"
                     >
                       <ShoppingBag className="w-3.5 h-3.5" />
-                      Agregar
+                      {Number(product.stock) > 0 ? 'Agregar' : 'Agotado'}
                     </button>
                   </div>
                 </div>
@@ -1294,9 +1309,15 @@ export default function App() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 flex justify-between text-[11px] text-slate-500">
           <p>© 2026 {storeInfo.legalName}. Todos los derechos reservados.</p>
-          <button onClick={triggerHiddenAdmin} className="hover:text-white transition-colors">Administración</button>
         </div>
       </footer>
+
+      {cartNotice && (
+        <div role="status" aria-live="polite" className="fixed bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl flex items-center gap-2">
+          <Check className="h-4 w-4 text-emerald-400" />
+          {cartNotice}
+        </div>
+      )}
 
       {isCartOpen && (
         <div className="fixed inset-0 z-40 bg-black/50" onClick={() => { setIsCartOpen(false); setIsCheckoutOpen(false); }}>
